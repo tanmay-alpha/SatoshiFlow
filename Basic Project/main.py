@@ -1,13 +1,34 @@
 import pandas as pd
 import numpy as np
-import talib as tb
-import pandas_ta as ta
 from backtester import BackTester
+
+
+def calculate_atr(df, period=14):
+    """
+    Calculate the Average True Range (ATR) using Wilder's smoothing.
+    """
+    high = df['high']
+    low = df['low']
+    close = df['close']
+
+    # True Range (TR) calculation
+    tr1 = high - low
+    tr2 = (high - close.shift(1)).abs()
+    tr3 = (low - close.shift(1)).abs()
+
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+
+    # Wilder's Smoothing: EMA with alpha = 1 / period
+    atr = tr.ewm(alpha=1.0 / period, adjust=False).mean()
+
+    # Set the first 'period - 1' values to NaN since they don't have enough data
+    atr.iloc[:period - 1] = np.nan
+    return atr
 
 
 def process_data(data):
     """
-    Process the input data and return a dataframe with all the necessary indicators and data for making signalss.
+    Process the input data and return a dataframe with all the necessary indicators and data for making signals.
 
     Parameters:
     data (pandas.DataFrame): The input data to be processed.
@@ -15,12 +36,114 @@ def process_data(data):
     Returns:
     pandas.DataFrame: The processed dataframe with all the necessary indicators and data.
     """
-    # Genereate the necessary indicators here
-    data['ATR'] = ta.atr(data['high'], data['low'], data['close'], length = 14)
+    # Generate the necessary indicators here
+    data['ATR'] = calculate_atr(data, period=14)
     return data
 
 
-def strat(data):
+def calculate_adx(df, period=14):
+    """
+    Calculate the Average Directional Index (ADX).
+    """
+    high = df['high']
+    low = df['low']
+    close = df['close']
+
+    # Calculate price changes
+    up_move = high - high.shift(1)
+    down_move = low.shift(1) - low
+
+    # Calculate directional movement
+    plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0)
+    minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0)
+
+    # Smooth directional movement
+    plus_dm_smooth = pd.Series(plus_dm).ewm(alpha=1.0/period, adjust=False).mean()
+    minus_dm_smooth = pd.Series(minus_dm).ewm(alpha=1.0/period, adjust=False).mean()
+
+    # Calculate true range
+    tr1 = high - low
+    tr2 = abs(high - close.shift(1))
+    tr3 = abs(low - close.shift(1))
+    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
+    tr_smooth = tr.ewm(alpha=1.0/period, adjust=False).mean()
+
+    # Calculate directional indices
+    plus_di = 100 * (plus_dm_smooth / tr_smooth)
+    minus_di = 100 * (minus_dm_smooth / tr_smooth)
+
+    # Calculate DX and ADX
+    dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di)
+    adx = dx.ewm(alpha=1.0/period, adjust=False).mean()
+
+    return adx, plus_di, minus_di
+
+
+def calculate_ema(df, period=14):
+    """
+    Calculate Exponential Moving Average.
+    """
+    return df['close'].ewm(span=period, adjust=False).mean()
+
+
+def calculate_rsi(df, period=14):
+    """
+    Calculate Relative Strength Index (RSI).
+    """
+    delta = df['close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+
+def calculate_bollinger_bands(df, period=20, std_dev=2):
+    """
+    Calculate Bollinger Bands.
+    """
+    sma = df['close'].rolling(window=period).mean()
+    std = df['close'].rolling(window=period).std()
+    upper_band = sma + (std * std_dev)
+    lower_band = sma - (std * std_dev)
+    return upper_band, sma, lower_band
+
+
+def process_data(data):
+    """
+    Process the input data and return a dataframe with all necessary indicators.
+    """
+    # Basic indicators
+    data['ATR'] = calculate_atr(data, period=14)
+
+    # Trend indicators
+    data['ADX'], data['DI+'], data['DI-'] = calculate_adx(data, period=14)
+
+    # Moving averages for trend following
+    data['ema_fast'] = calculate_ema(data, period=12)
+    data['ema_slow'] = calculate_ema(data, period=26)
+
+    # Donchian channels for breakout detection
+    data['donchian_high'] = data['high'].rolling(window=20).max()
+    data['donchian_low'] = data['low'].rolling(window=20).min()
+    data['donchian_mid'] = (data['donchian_high'] + data['donchian_low']) / 2
+
+    # Volume indicators
+    data['volume_ma20'] = data['volume'].rolling(window=20).mean()
+    data['volume_std20'] = data['volume'].rolling(window=20).std()
+    data['volume_zscore'] = (data['volume'] - data['volume_ma20']) / data['volume_std20']
+
+    # Mean reversion indicators
+    data['RSI'] = calculate_rsi(data, period=14)
+
+    # Bollinger Bands
+    data['bb_upper'], data['bb_mid'], data['bb_lower'] = calculate_bollinger_bands(data, period=20, std_dev=2)
+    data['bb_percent'] = (data['close'] - data['bb_lower']) / (data['bb_upper'] - data['bb_lower'])
+
+    return data
+
+
+def strat(data, adx_threshold=25):
     """
     Create a strategy based on indicators or other factors.
 
@@ -128,7 +251,7 @@ def strat(data):
     return data
 
 def main():
-    data = pd.read_csv("BTC_2019_2023_1d.csv")
+    data = pd.read_csv("btc_18_22_1d.csv")
     processed_data = process_data(data) # process the data
     result_data = strat(processed_data) # Apply the strategy
     csv_file_path = "final_data.csv" 
@@ -155,7 +278,7 @@ def main():
         if result_data.loc[i, 'signals'] != 0:  # If there's a signal
             temp_data = data.iloc[:i+1].copy()  # Take data only up to that point
             temp_data = process_data(temp_data) # process the data
-            temp_data = strat(temp_data) # Re-run strategy
+            temp_data = strat(temp_data, adx_threshold=25) # Re-run strategy
             if temp_data.loc[i, 'signals'] != result_data.loc[i, 'signals']:
                 print(f"Lookahead bias detected at index {i}")
                 lookahead_bias = True
@@ -164,8 +287,8 @@ def main():
         print("No lookahead bias detected.")
 
     # Generate the PnL graph
-    bt.make_trade_graph()
-    bt.make_pnl_graph()
+    # bt.make_trade_graph()
+    # bt.make_pnl_graph()
     
 if __name__ == "__main__":
     main()
