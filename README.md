@@ -12,12 +12,8 @@ SatoshiFlow/
 ├── README.md                      # Platform documentation and quickstart
 └── Basic Project/                 # Core Python engine and analytical scripts
     ├── btc_18_22_1d.csv           # Historical OHLCV Bitcoin data (2018-2022)
-    ├── final_data.csv             # Strategy signals and generated indicators
-    ├── main.py                    # Strategy entrypoint & indicator calculation rules
+    ├── main.py                    # Strategy entrypoint with indicators and strategy
     ├── backtester.py              # Event-driven backtesting execution engine
-    ├── walk_forward_validation.py # Out-of-sample parameter optimization framework
-    ├── plot_equity.py             # Performance plotting and visualization suite
-    ├── run_analysis.py            # Automation script orchestrating the full pipeline
     └── Problem_statement.pdf      # Original challenge requirements
 ```
 
@@ -44,10 +40,12 @@ Simulates realistic trade execution by processing bar-by-bar states:
 *   **Fee Friction:** Deducts a standard transaction fee of `0.15%` (`0.0015`) per trade side.
 *   **Metric Computations:** Calculates win rates, Sharpe/Sortino ratios, streaks, holding durations, and maximum drawdowns.
 
-### 3. Parameter Optimization (`walk_forward_validation.py`)
-To prevent overfitting (curve-fitting) and assure robustness:
-*   **Multi-Fold Cross-Validation:** Splits historical data into train/validation folds by year.
-*   **Objective Function:** Optimizes the ADX threshold using worst-fold Sharpe ratio to select the most stable parameters.
+### 3. Strategy Implementation (`main.py`)
+The implemented strategy is a **Regime-Filtered Trend Follower**:
+*   **Entry:** Donchian breakout (20-day high/low) when ADX > threshold
+*   **Exit:** ATR trailing stop (2x multiplier)
+*   **Regime Filter:** Only trades when ADX > 20-25, avoiding choppy markets
+*   **Position Sizing:** 100% equity allocation per trade
 
 ### 4. Verification & Bias Checks
 *   **Lookahead Bias Checker:** A temporal isolation unit running in `main.py` verifies that signals are strictly historical and no future data leaks into the indicator pipeline.
