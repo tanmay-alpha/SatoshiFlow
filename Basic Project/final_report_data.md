@@ -1,4 +1,4 @@
-﻿# BTC Strategy — Final Report Data
+# BTC Strategy — Final Report Data
 
 **Data file SHA-256:** `32814cd9f3b83dc79a0092c1f1c24bd988dad4c4b230dcd421401025ac660748`
 **Dataset:** 1826 rows, 2018-01-01 to 2022-12-31
@@ -67,7 +67,7 @@ Losing Trades             : 6
 No. of Long Trades        : 3
 No. of Short Trades       : 9
 Benchmark Return(%)       : -65.20000461
-Benchmark Return(on ): -652.0000461
+Benchmark Return(on $1000): -652.0000461
 Win Rate                  : 50.0
 Winning Streak            : 2
 Losing Streak             : 4
