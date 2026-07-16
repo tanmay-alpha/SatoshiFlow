@@ -82,7 +82,7 @@ for threshold in adx_thresholds:
             threshold_results.append({
                 'Sharpe Ratio': stats.get('Sharpe Ratio', 0),
                 'Max Drawdown %': stats.get('Maximum Drawdown(%)', 0),
-                'Net Profit %': stats.get('Net Profit', 0) / 10,
+                'Net Profit %': stats.get('Net Profit', 0) / 1000 * 100,
                 'Win Rate %': stats.get('Win Rate', 0),
                 'Total Trade Count': stats.get('Total Trades', 0)
             })

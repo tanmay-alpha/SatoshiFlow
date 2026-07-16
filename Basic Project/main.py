@@ -105,7 +105,7 @@ def strat(data, adx_threshold=None):
     num_wrong = 0
 
     for i in range(14, len(data)):
-        vol_spike = data.loc[i-5:i, 'volume'].mean() + 1.5 * data.loc[i-5:i, 'volume'].std()
+        vol_spike = data.loc[i-6:i-1, 'volume'].mean() + 1.5 * data.loc[i-6:i-1, 'volume'].std()
         strong_trend = data.loc[i, 'ADX'] >= adx_threshold
 
         if position == 0:
@@ -201,7 +201,7 @@ def main():
 
     # Run backtester - NOTE: get_trades() is called with 1000 as argument
     bt = BackTester("BTC", signal_data_path=csv_file_path, master_file_path=csv_file_path, compound_flag=1)
-    bt.get_trades.__func__(bt, 1000)
+    bt.get_trades(1000)
 
     stats = bt.get_statistics()
     if stats:
