@@ -356,21 +356,31 @@ class BackTester:
         if "pnl" in self.data.columns:
             return
 
-        # init_timestamp and final_timestamp are bar_datetime + 1min (set by preprocess_csv).
-        # A trade's open bar is the bar with datetime == init_timestamp - 1min.
-        # Per-bar unrealised P&L is qty * (close_t - close_{t-1}) / init_price, but only
-        # from the bar AFTER the open bar onward (the open bar itself records 0).
-        # The close bar (final_timestamp - 1min) also incurs the transaction fee.
+        pnls = []
 
-        pnls = [0.0] * len(self.data)
-        date_index = self.data.index
+        curr_trade_idx = 0
+        is_trade_open = False
 
-        for trade in self.trades:
-            close_bar_time = trade.final_timestamp - pd.Timedelta(minutes=1)
-            match_idx = date_index.get_indexer([close_bar_time], method="nearest")[0]
-            if match_idx >= 0:
-                pnls[match_idx] += trade.pnl()
+        prev_row = None
 
+        for index, row in self.data.iterrows():        
+            if curr_trade_idx < len(self.trades):
+                curr_trade = self.trades[curr_trade_idx]
+                if curr_trade.final_timestamp <= index and is_trade_open:
+                    is_trade_open = False
+                    pnl = -transaction_fee * abs(curr_trade.qty)
+                    curr_trade_idx += 1
+                elif curr_trade.init_timestamp <= index:
+                    is_trade_open = True
+                    pnl = curr_trade.qty * (row["close"] - prev_row["close"]) / curr_trade.init_price
+                else:
+                    pnl = 0
+            else:
+                pnl = 0
+
+            pnls.append(pnl)
+            prev_row = row
+        
         self.data["pnl"] = pnls
 
     def calc_capital(self):
@@ -418,7 +428,7 @@ class BackTester:
         # Calculate Sharpe ratios
         granular_sharpe = np.mean(pnls) / np.std(pnls) if len(pnls) > 0 else np.nan
 
-        return granular_sharpe*np.sqrt(365)
+        return granular_sharpe*np.sqrt(252)
     
     def get_granular_sharpe_ratio_window(self, window_size="6ME", period="1D"):
         """
