@@ -1,0 +1,41 @@
+{
+  "benchmark_return_percentage": 23.63527653213753,
+  "brokerage_model": "Organizer TradePair.pnl deducts 0.15% of absolute trade quantity once per completed trade.",
+  "brokerage_rate": 0.0015,
+  "dataset_filename": "btc_18_22_1d.csv",
+  "dataset_first_date": "2018-01-01T05:30:00",
+  "dataset_last_date": "2022-12-31T05:30:00",
+  "dataset_row_count": 1826,
+  "dataset_sha256": "32814cd9f3b83dc79a0092c1f1c24bd988dad4c4b230dcd421401025ac660748",
+  "execution_model": "Decision on completed candle t is shifted to candle t+1; organizer backtester executes at candle t+1 close.",
+  "final_capital": 5463.612624547606,
+  "forced_final_liquidation": false,
+  "initial_capital": 1000.0,
+  "lookahead_check": true,
+  "lookahead_cutoffs": [
+    204,
+    456,
+    913,
+    1369,
+    1823
+  ],
+  "maximum_drawdown_percentage": 21.366536605061913,
+  "net_profit": 4463.612624547606,
+  "net_return": 4.463612624547606,
+  "organizer_backtester_check": true,
+  "parameters": {
+    "adx_period": 14,
+    "adx_threshold": 20.0,
+    "atr_period": 14,
+    "atr_stop_multiplier": 2.5,
+    "donchian_period": 30,
+    "ema_period": 200
+  },
+  "reproducibility_check": true,
+  "sharpe_ratio": 1.011694677014896,
+  "signal_shift_check": true,
+  "signal_validity_check": true,
+  "total_brokerage": 136.70389799048175,
+  "total_trades": 29,
+  "win_rate_percentage": 55.172413793103445
+}
