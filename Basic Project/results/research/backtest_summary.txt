@@ -3,17 +3,17 @@ Engine: stricter next-open mark-to-market simulator
 Dataset: btc_18_22_1d.csv
 SHA-256: 32814cd9f3b83dc79a0092c1f1c24bd988dad4c4b230dcd421401025ac660748
 Dataset range: 2018-01-01T05:30:00 to 2022-12-31T05:30:00
-Initial capital: $1000.00
+Initial capital: $1000000.00
 Brokerage rate per transaction: 0.1500%
-Final equity: $3743.40
-Net profit: $2743.40
+Final equity: $3743399.41
+Net profit: $2743399.41
 Net return: 274.3399%
 Sharpe ratio: 0.818167
 Maximum drawdown: 54.6380%
 Win rate: 48.2759%
 Total trades: 29
 Entries / exits / reversals: 29 / 29 / 0
-Total brokerage: $237.0155
-Gross profit before brokerage: $2980.4149
+Total brokerage: $237015.4892
+Gross profit before brokerage: $2980414.8971
 LOOKAHEAD CHECK: PASS
 REPRODUCIBILITY CHECK: PASS

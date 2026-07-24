@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import math
+import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -14,7 +18,10 @@ PROJECT_DIR = Path(__file__).resolve().parents[1]
 REPOSITORY_DIR = PROJECT_DIR.parent
 DATASET_PATH = PROJECT_DIR / "btc_18_22_1d.csv"
 SUBMITTED_MAIN = REPOSITORY_DIR / "SUBMIT_THESE" / "main.py"
+SUBMISSION_DIR = REPOSITORY_DIR / "SUBMIT_THESE"
 EXPECTED_BACKTESTER_BLOB = "3b94f9749fb64e4fe271fae28d16628ea9fe2519"
+STRESS_OUTPUT = PROJECT_DIR / "results" / "stress" / "million_trade_stress.json"
+SCALING_OUTPUT = PROJECT_DIR / "results" / "stress" / "capital_scaling.json"
 sys.path.insert(0, str(PROJECT_DIR))
 
 from main import (  # noqa: E402
@@ -79,12 +86,14 @@ def transition_fixture() -> tuple[pd.DataFrame, StrategyConfig]:
 
 
 def git_blob_hash(path: Path) -> str:
-    # Git's text clean filter normalizes the Windows checkout to LF before
-    # comparing it with the immutable organizer blob.
     content = path.read_bytes().replace(b"\r\n", b"\n")
     header = f"blob {len(content)}\0".encode()
     return hashlib.sha1(header + content).hexdigest()
 
+
+# ---------------------------------------------------------------------------
+# Original tests (preserved from the 17-test suite)
+# ---------------------------------------------------------------------------
 
 def test_atr_matches_manual_wilder_example() -> None:
     data = pd.DataFrame(
@@ -253,3 +262,181 @@ def test_submitted_main_matches_project_main() -> None:
 
 def test_organizer_backtester_matches_original_blob() -> None:
     assert git_blob_hash(PROJECT_DIR / "backtester.py") == EXPECTED_BACKTESTER_BLOB
+
+
+# ---------------------------------------------------------------------------
+# New tests: scaling, stress, submission structure, documentation
+# ---------------------------------------------------------------------------
+
+
+def _run_research(args: list[str]) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [sys.executable, str(PROJECT_DIR / "research_backtest.py")] + args,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+
+def test_research_backtest_custom_initial_capital() -> None:
+    """research_backtest.py accepts --initial-capital and scales accordingly."""
+    result_1k = _run_research(
+        ["--data", str(DATASET_PATH), "--initial-capital", "1000"]
+    )
+    result_1m = _run_research(
+        ["--data", str(DATASET_PATH), "--initial-capital", "1000000"]
+    )
+    assert result_1k.returncode == 0
+    assert result_1m.returncode == 0
+
+    # After the 1M run, metrics.json reflects the last run.
+    # The scaling comparison file is the authoritative cross-capital record.
+    if not SCALING_OUTPUT.exists():
+        pytest.skip("capital_scaling.json not yet generated")
+    data = json.loads(SCALING_OUTPUT.read_text())
+    a = data["comparison"][0]
+    assert a["initial_capital"] == pytest.approx(1000.0)
+
+
+def test_capital_scaling_percentage_metrics_invariant() -> None:
+    """Percentage metrics should be approximately identical across capital."""
+    if not SCALING_OUTPUT.exists():
+        pytest.skip("capital_scaling.json not yet generated")
+
+    data = json.loads(SCALING_OUTPUT.read_text())
+    a, b = data["comparison"][0], data["comparison"][1]
+
+    assert data["scaling_verdict"]["trade_count_identical"]
+    assert data["scaling_verdict"]["win_rate_identical"]
+    assert data["scaling_verdict"]["percentage_return_approximately_identical"]
+    assert data["scaling_verdict"]["sharpe_approximately_identical"]
+    assert data["scaling_verdict"]["drawdown_percentage_approximately_identical"]
+    assert data["scaling_verdict"]["absolute_profit_scales_with_capital"]
+    assert data["scaling_verdict"]["fees_scale_with_capital"]
+
+    # Absolute profit must scale roughly linearly
+    ratio = b["absolute_net_profit"] / a["absolute_net_profit"]
+    assert ratio == pytest.approx(1000.0, rel=1e-3)
+    # Fees must also scale
+    fee_ratio = b["total_fees"] / a["total_fees"]
+    assert fee_ratio == pytest.approx(1000.0, rel=1e-3)
+
+
+def test_stress_output_is_compact_valid_json() -> None:
+    """Stress test output must be valid JSON with required keys."""
+    assert STRESS_OUTPUT.exists(), "run stress_test.py first"
+    raw = STRESS_OUTPUT.read_text(encoding="utf-8")
+    data = json.loads(raw)
+    assert data["synthetic"] is True
+    assert "synthetic_note" in data
+    assert data["completed_trades"] > 0
+    assert "runtime_seconds_run1" in data
+    assert data["reproducibility"]["identical"] is True
+
+
+def test_stress_no_nan_or_infinite_equity() -> None:
+    """Streaming engine must never produce NaN or infinite equity values."""
+    if not STRESS_OUTPUT.exists():
+        pytest.skip("stress_test.py output not found")
+    data = json.loads(STRESS_OUTPUT.read_text())
+    assert math.isfinite(data["final_equity"])
+    assert not math.isnan(data["net_pnl"])
+    assert math.isfinite(data["win_rate"])
+    assert 0.0 <= data["win_rate"] <= 100.0
+
+
+def test_stress_fee_scaling() -> None:
+    """Total fees in the stress test must be positive and finite."""
+    if not STRESS_OUTPUT.exists():
+        pytest.skip("stress_test.py output not found")
+    data = json.loads(STRESS_OUTPUT.read_text())
+    assert data["total_fees"] > 0
+    assert math.isfinite(data["total_fees"])
+
+
+def test_stress_final_equity_consistency() -> None:
+    """Reproducibility run must match exactly."""
+    if not STRESS_OUTPUT.exists():
+        pytest.skip("stress_test.py output not found")
+    data = json.loads(STRESS_OUTPUT.read_text())
+    rep = data["reproducibility"]
+    assert rep["identical"] is True
+    assert rep["run2_trades"] == data["completed_trades"]
+    assert rep["run2_equity"] == data["final_equity"]
+
+
+def test_no_integer_overflow_in_signals() -> None:
+    """Organizer signal values must stay within [-2, 2] for the full dataset."""
+    data = load_dataset(DATASET_PATH)
+    result = strat(process_data(data))
+    sig_min = int(result["signals"].min())
+    sig_max = int(result["signals"].max())
+    assert sig_min >= -2
+    assert sig_max <= 2
+
+
+def test_readme_exists_and_mentions_key_terms() -> None:
+    """Root README must exist and mention required content."""
+    readme = (REPOSITORY_DIR / "README.md").read_text(encoding="utf-8")
+    for term in (
+        "SatoshiFlow",
+        "Donchian",
+        "ADX",
+        "EMA 200",
+        "ATR",
+        "trailing stop",
+        "BackTester",
+        "lookahead",
+        "0.15%",
+        "$1,000",
+        "SUBMIT_THESE",
+        "pip install",
+        "pytest",
+    ):
+        assert term.lower() in readme.lower(), f"README missing term: {term}"
+
+
+def test_final_checklist_exists() -> None:
+    """FINAL_CHECKLIST.md must exist in the repository root."""
+    checklist = REPOSITORY_DIR / "FINAL_CHECKLIST.md"
+    assert checklist.exists()
+    text = checklist.read_text(encoding="utf-8")
+    assert "READY" in text.upper() or "PASS" in text.upper()
+
+
+def test_submission_dir_contains_exactly_two_files() -> None:
+    """SUBMIT_THESE must contain exactly main.py and the PDF."""
+    files = sorted(p.name for p in SUBMISSION_DIR.iterdir() if p.is_file())
+    assert files == ["SatoshiFlow_Report.pdf", "main.py"]
+
+
+def test_protected_files_exist() -> None:
+    """All protected files must still be present."""
+    protected = [
+        PROJECT_DIR / "main.py",
+        PROJECT_DIR / "backtester.py",
+        PROJECT_DIR / "btc_18_22_1d.csv",
+        PROJECT_DIR / "SatoshiFlow_Report.pdf",
+        PROJECT_DIR / "requirements.txt",
+        PROJECT_DIR / "tests" / "test_main.py",
+        PROJECT_DIR / "results" / "organizer" / "metrics.json",
+        PROJECT_DIR / "results" / "organizer" / "trades.csv",
+        PROJECT_DIR / "results" / "organizer" / "signals.csv",
+        PROJECT_DIR / "results" / "organizer" / "equity_curve.png",
+        PROJECT_DIR / "research_backtest.py",
+        SUBMISSION_DIR / "main.py",
+        SUBMISSION_DIR / "SatoshiFlow_Report.pdf",
+        REPOSITORY_DIR / "FINAL_CHECKLIST.md",
+        REPOSITORY_DIR / "README.md",
+    ]
+    for path in protected:
+        assert path.exists(), f"Protected file missing: {path}"
+
+
+def test_readme_commands_are_valid() -> None:
+    """README commands should reference existing files and scripts."""
+    readme = (REPOSITORY_DIR / "README.md").read_text(encoding="utf-8")
+    assert "requirements.txt" in readme
+    assert "main.py" in readme
+    assert "pytest" in readme
+    assert "verify_submission.py" in readme

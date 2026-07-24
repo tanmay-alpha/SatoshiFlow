@@ -1,0 +1,31 @@
+{
+  "completed_trades": 1000001,
+  "final_equity": 1.6748065e-317,
+  "gross_profit": 0.3886059484373952,
+  "initial_capital": 1000000.0,
+  "losses": 937975,
+  "maximum_drawdown": 199.75236179447828,
+  "net_pnl": -1000000.0,
+  "peak_memory_kb": 1.01171875,
+  "profit_factor": 0.06612756203523548,
+  "reproducibility": {
+    "identical": true,
+    "run2_drawdown": 199.75236179447828,
+    "run2_equity": 1.6748065e-317,
+    "run2_fees": 503351.4800920502,
+    "run2_trades": 1000001,
+    "run2_win_rate": 6.202593797406203
+  },
+  "requested_trades": 1000000,
+  "rows_processed": 2000001,
+  "rss_mb": 247.13671875,
+  "runtime_seconds_run1": 95.80493569999999,
+  "runtime_seconds_run2": 2.7659137999999075,
+  "seed": 20260724,
+  "synthetic": true,
+  "synthetic_note": "SCALABILITY test using deterministic synthetic data. NOT real BTC strategy performance.",
+  "test": "one_million_trade_engine_stress",
+  "total_fees": 503351.4800920502,
+  "win_rate": 6.202593797406203,
+  "wins": 62026
+}

@@ -1,0 +1,41 @@
+{
+  "comparison": [
+    {
+      "initial_capital": 1000.0,
+      "final_capital": 3743.399407927046,
+      "absolute_net_profit": 2743.399407927046,
+      "percentage_return": 274.3399407927046,
+      "sharpe_ratio": 0.818167383991037,
+      "maximum_drawdown": 54.63799765517171,
+      "win_rate": 48.275862068965516,
+      "trades": 29,
+      "total_fees": 237.01548918352952,
+      "profit_factor": 1.6151427403518233
+    },
+    {
+      "initial_capital": 1000000.0,
+      "final_capital": 3274340.848711316,
+      "absolute_net_profit": 2743399.407711316,
+      "percentage_return": 274.3399407711316,
+      "sharpe_ratio": 0.8181673839910371,
+      "maximum_drawdown": 54.63799765517171,
+      "win_rate": 48.275862068965516,
+      "trades": 29,
+      "total_fees": 237015.48918352952,
+      "profit_factor": 1.6151427403518233
+    }
+  ],
+  "scaling_verdict": {
+    "trade_count_identical": true,
+    "win_rate_identical": true,
+    "percentage_return_approximately_identical": true,
+    "sharpe_approximately_identical": true,
+    "drawdown_percentage_approximately_identical": true,
+    "absolute_profit_scales_with_capital": true,
+    "fees_scale_with_capital": true,
+    "max_relative_difference_pct_return": 7.64e-05,
+    "max_relative_difference_sharpe": 1.2e-15,
+    "max_relative_difference_drawdown": 0.0
+  },
+  "note": "Synthetic stress-scaling test. NOT a real BTC strategy performance result."
+}

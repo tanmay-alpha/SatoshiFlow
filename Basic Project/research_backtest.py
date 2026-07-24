@@ -760,6 +760,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--results-dir",
         help="output directory (default: Basic Project/results/research)",
     )
+    parser.add_argument(
+        "--initial-capital",
+        type=float,
+        default=INITIAL_CAPITAL,
+        help=f"starting equity for the research engine (default: {INITIAL_CAPITAL})",
+    )
     return parser
 
 
@@ -786,20 +792,24 @@ def main(argv: list[str] | None = None) -> int:
     )
     data = official_load_dataset(dataset_path)
     digest = official_dataset_hash(dataset_path)
+    initial_capital = float(args.initial_capital)
 
     print(f"Selected dataset: {dataset_path.name}")
     print(f"Rows: {len(data)}")
     print(f"First date: {data['datetime'].iloc[0].isoformat()}")
     print(f"Last date: {data['datetime'].iloc[-1].isoformat()}")
     print(f"SHA-256: {digest}")
+    print(f"Initial capital: ${initial_capital:,.2f}")
 
     indicators = official_process_data(data, OFFICIAL_CONFIG)
     signals = official_strat(indicators, OFFICIAL_CONFIG, force_close=True)
     assert_signal_shift(signals)
     run_lookahead_check(data, OFFICIAL_CONFIG)
 
-    metrics, trades, equity = run_backtest(signals)
-    repeat_metrics, repeat_trades, repeat_equity = run_backtest(signals)
+    metrics, trades, equity = run_backtest(signals, initial_capital=initial_capital)
+    repeat_metrics, repeat_trades, repeat_equity = run_backtest(
+        signals, initial_capital=initial_capital
+    )
     if json.dumps(metrics, sort_keys=True, allow_nan=False) != json.dumps(
         repeat_metrics, sort_keys=True, allow_nan=False
     ):
