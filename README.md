@@ -1,10 +1,10 @@
 # SatoshiFlow
 
-Reproducible BTC/USD strategy submission with next-candle execution,
-round-trip brokerage accounting, mark-to-market equity, integrity tests, and a
-generated PDF report.
+Organizer-compatible BTC/USD trend strategy submission using the unchanged
+challenge `BackTester`, one-bar-shifted decisions, custom indicators, integrity
+tests, separated robustness results, and a generated PDF report.
 
-See [Basic Project/README.md](Basic%20Project/README.md) for installation,
-methodology, exact commands, outputs, and the current dataset limitation.
+See [Basic Project/README.md](Basic%20Project/README.md) for the methodology,
+exact commands, generated outputs, framework fee behavior, and verification.
 
-Submission-ready files are generated in `SUBMIT_THESE/`.
+The final two-file package is in `SUBMIT_THESE/`.

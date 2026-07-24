@@ -3,35 +3,58 @@
 ## Recovered source
 
 The initial repository commit is `ffd7487758488e56664ba1cb8bb859066d126fd5`.
-Its `Basic Project/backtester.py` Git blob is:
+Its organizer-provided `Basic Project/backtester.py` is Git blob:
 
 `3b94f9749fb64e4fe271fae28d16628ea9fe2519`
 
-The working file has been restored from that exact blob. This can be verified:
+The working file is unchanged from that blob:
 
 ```powershell
 git rev-parse ffd7487:"Basic Project/backtester.py"
 git hash-object "Basic Project/backtester.py"
 ```
 
-Both commands must print the same blob ID.
+Both commands print the same ID.
 
-## Why verified results do not use its metrics
+## Official execution path
 
-The organizer PDF requires a signal formed on candle `i` to execute at candle
-`i+1` open and defines 0.15% brokerage on entry and exit. The recovered starter
-framework:
+`main.py` imports `BackTester` directly:
 
-1. executes a signal using the signal row's `close`;
-2. deducts one fee inside `TradePair.pnl()`, not separate entry and exit fees;
-3. leaves a final open position incomplete;
-4. uses a fixed $1,000 capital base in `calc_capital()`;
-5. cannot produce a complete daily mark-to-market equity series under those
-   constraints.
+```python
+from backtester import BackTester
+```
 
-Changing these behaviors inside `backtester.py` would violate the explicit
-“DO NOT MODIFY” challenge instruction. Therefore `main.py` contains a separate,
-documented simulator for local verification and report generation while still
-exposing the required `process_data()` and `strat()` functions.
+It writes the generated signals and calls the original public API normally:
 
-No framework formula was changed to improve performance.
+```python
+bt = BackTester(
+    "BTC",
+    signal_data_path=final_data_path,
+    master_file_path=final_data_path,
+    compound_flag=1,
+)
+bt.get_trades(1000)
+stats = bt.get_statistics()
+```
+
+Those returned statistics are the official headline results. The organizer
+file is not patched or wrapped.
+
+## Timing adaptation
+
+The framework executes a signal at its row's close. The strategy prevents
+same-row decision execution by calculating the decision after completed bar
+`t`, then placing its valid signal on bar `t+1`. This yields conservative
+next-bar-close execution while preserving the official engine.
+
+## Fee behavior
+
+The challenge configuration is 0.15%. In the recovered framework,
+`TradePair.pnl()` deducts `0.0015 * abs(qty)` once per completed trade, rather
+than separate entry and exit notionals. The official output reports that
+behavior exactly. It is not modified to improve or penalize results.
+
+`research_backtest.py` remains a clearly secondary audit with next-open
+execution, daily mark-to-market equity, and separate 0.15% entry and exit
+fees. Its outputs are isolated under `results/research/` and are never used
+as the organizer headline table.

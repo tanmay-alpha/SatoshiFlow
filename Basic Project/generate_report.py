@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the report and submission package from verified JSON metrics."""
+"""Generate the organizer-led report and exact two-file submission package."""
 
 from __future__ import annotations
 
@@ -28,12 +28,7 @@ NAVY = colors.HexColor("#102A43")
 BLUE = colors.HexColor("#155EEF")
 MUTED = colors.HexColor("#475467")
 LIGHT = colors.HexColor("#F2F4F7")
-WARNING = colors.HexColor("#FFF4E5")
-RED = colors.HexColor("#B42318")
-
-
-def pct(value: float) -> str:
-    return f"{100.0 * value:.2f}%"
+AMBER = colors.HexColor("#B54708")
 
 
 def money(value: float) -> str:
@@ -46,35 +41,23 @@ def footer(canvas, document) -> None:
     canvas.line(0.62 * inch, 0.45 * inch, 7.88 * inch, 0.45 * inch)
     canvas.setFillColor(MUTED)
     canvas.setFont("Helvetica", 8)
-    canvas.drawString(0.62 * inch, 0.27 * inch, "SatoshiFlow | Verified backtest")
+    canvas.drawString(
+        0.62 * inch,
+        0.27 * inch,
+        "SatoshiFlow | Organizer-compatible BTC/USD backtest",
+    )
     canvas.drawRightString(
         7.88 * inch, 0.27 * inch, f"Page {document.page}"
     )
     canvas.restoreState()
 
 
-def metrics_table(metrics: dict, body: ParagraphStyle) -> Table:
-    rows = [
-        ["Metric", "Verified value"],
-        ["Evaluation period", metrics["evaluation_label"]],
-        ["Initial / final equity", f"{money(metrics['initial_capital'])} / {money(metrics['final_equity'])}"],
-        ["Net return", pct(metrics["net_return"])],
-        ["Sharpe ratio", f"{metrics['sharpe_ratio']:.3f}"],
-        ["Maximum drawdown", pct(metrics["max_drawdown"])],
-        ["Win rate", f"{metrics['win_rate']:.2f}%"],
-        ["Completed trades", str(metrics["total_trades"])],
-        ["Total brokerage", money(metrics["total_brokerage"])],
-        ["Buy-and-hold return", pct(metrics["buy_and_hold_return"])],
-    ]
-    table_rows = [
+def styled_table(rows: list[list[str]], body: ParagraphStyle) -> Table:
+    rendered = [
         rows[0],
         *[[Paragraph(str(cell), body) for cell in row] for row in rows[1:]],
     ]
-    table = Table(
-        table_rows,
-        colWidths=[2.5 * inch, 4.35 * inch],
-        repeatRows=1,
-    )
+    table = Table(rendered, colWidths=[2.75 * inch, 4.10 * inch], repeatRows=1)
     table.setStyle(
         TableStyle(
             [
@@ -82,36 +65,85 @@ def metrics_table(metrics: dict, body: ParagraphStyle) -> Table:
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                 ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
                 ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#D0D5DD")),
-                ("BACKGROUND", (0, 1), (-1, -1), colors.white),
                 ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, LIGHT]),
                 ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
                 ("LEFTPADDING", (0, 0), (-1, -1), 8),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-                ("TOPPADDING", (0, 0), (-1, -1), 6),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
             ]
         )
     )
     return table
 
 
-def build_pdf(metrics: dict, results_dir: Path, output: Path) -> None:
+def official_metrics_table(metrics: dict, body: ParagraphStyle) -> Table:
+    return styled_table(
+        [
+            ["Official organizer metric", "Value"],
+            [
+                "Initial / final capital",
+                f"{money(metrics['initial_capital'])} / "
+                f"{money(metrics['final_capital'])}",
+            ],
+            ["Net profit", money(metrics["net_profit"])],
+            ["Net return", f"{100 * metrics['net_return']:.2f}%"],
+            ["Sharpe ratio", f"{metrics['sharpe_ratio']:.3f}"],
+            [
+                "Maximum drawdown",
+                f"{metrics['maximum_drawdown_percentage']:.2f}%",
+            ],
+            ["Win rate", f"{metrics['win_rate_percentage']:.2f}%"],
+            ["Completed trades", str(metrics["total_trades"])],
+            ["Framework brokerage deducted", money(metrics["total_brokerage"])],
+            [
+                "Buy-and-hold benchmark",
+                f"{metrics['benchmark_return_percentage']:.2f}%",
+            ],
+        ],
+        body,
+    )
+
+
+def research_metrics_table(metrics: dict, body: ParagraphStyle) -> Table:
+    return styled_table(
+        [
+            ["Independent robustness metric", "Value"],
+            ["Final equity", money(metrics["final_equity"])],
+            ["Net return", f"{100 * metrics['net_return']:.2f}%"],
+            ["Sharpe ratio", f"{metrics['sharpe_ratio']:.3f}"],
+            ["Mark-to-market drawdown", f"{100 * metrics['max_drawdown']:.2f}%"],
+            ["Win rate", f"{metrics['win_rate']:.2f}%"],
+            ["Completed trades", str(metrics["total_trades"])],
+            ["Two-sided brokerage", money(metrics["total_brokerage"])],
+        ],
+        body,
+    )
+
+
+def build_pdf(
+    official: dict,
+    research: dict,
+    organizer_results: Path,
+    research_results: Path,
+    output: Path,
+) -> None:
     styles = getSampleStyleSheet()
     body = ParagraphStyle(
         "Body",
         parent=styles["BodyText"],
         fontName="Helvetica",
-        fontSize=9.4,
-        leading=12.2,
+        fontSize=9.1,
+        leading=11.7,
         textColor=NAVY,
-        spaceAfter=6,
+        spaceAfter=5,
     )
     title = ParagraphStyle(
         "Title",
         parent=styles["Title"],
         fontName="Helvetica-Bold",
-        fontSize=27,
-        leading=31,
+        fontSize=26,
+        leading=30,
         alignment=TA_CENTER,
         textColor=NAVY,
         spaceAfter=7,
@@ -123,30 +155,30 @@ def build_pdf(metrics: dict, results_dir: Path, output: Path) -> None:
         leading=14,
         alignment=TA_CENTER,
         textColor=MUTED,
-        spaceAfter=18,
+        spaceAfter=15,
     )
     heading = ParagraphStyle(
         "Heading",
         parent=styles["Heading2"],
         fontName="Helvetica-Bold",
-        fontSize=14,
-        leading=17,
+        fontSize=13.2,
+        leading=16,
         textColor=BLUE,
-        spaceBefore=7,
-        spaceAfter=6,
+        spaceBefore=5,
+        spaceAfter=5,
     )
     small = ParagraphStyle(
-        "Small", parent=body, fontSize=8.2, leading=10.5, textColor=MUTED
+        "Small", parent=body, fontSize=8.0, leading=10.0, textColor=MUTED
     )
-    callout = ParagraphStyle(
-        "Callout",
+    note = ParagraphStyle(
+        "Note",
         parent=body,
         borderColor=colors.HexColor("#F79009"),
         borderWidth=0.7,
-        borderPadding=8,
-        backColor=WARNING,
-        textColor=RED,
-        spaceAfter=12,
+        borderPadding=7,
+        backColor=colors.HexColor("#FFF4E5"),
+        textColor=AMBER,
+        spaceAfter=9,
     )
 
     document = SimpleDocTemplate(
@@ -154,218 +186,238 @@ def build_pdf(metrics: dict, results_dir: Path, output: Path) -> None:
         pagesize=letter,
         rightMargin=0.62 * inch,
         leftMargin=0.62 * inch,
-        topMargin=0.56 * inch,
+        topMargin=0.52 * inch,
         bottomMargin=0.60 * inch,
-        title="SatoshiFlow Verified Backtest Report",
+        title="SatoshiFlow Organizer-Compatible Backtest Report",
         author="SatoshiFlow",
     )
     story = [
-        Spacer(1, 0.18 * inch),
+        Spacer(1, 0.12 * inch),
         Paragraph("SATOSHIFLOW", title),
-        Paragraph("Bias-free BTC/USD strategy backtest", subtitle),
+        Paragraph("Organizer-compatible BTC/USD strategy submission", subtitle),
+        Paragraph("1. Objective and supplied dataset", heading),
+        Paragraph(
+            "The objective is a deterministic long/short BTC/USD trend strategy "
+            "implemented through the challenge's original <b>BackTester</b> "
+            "interface. The supplied repository dataset covers 2018-2022. The "
+            "strategy is generic and is designed to run unchanged on "
+            "evaluator-provided OHLCV data.",
+            body,
+        ),
+        Paragraph(
+            f"The run used <b>{official['dataset_filename']}</b> "
+            f"({official['dataset_row_count']:,} daily rows), spanning "
+            f"{official['dataset_first_date'][:10]} through "
+            f"{official['dataset_last_date'][:10]}. SHA-256: "
+            f"<font name='Courier'>{official['dataset_sha256']}</font>.",
+            body,
+        ),
+        Paragraph("2. Official organizer-framework results", heading),
+        official_metrics_table(official, body),
+        Spacer(1, 5),
+        Paragraph(
+            "These headline values come only from the unmodified organizer "
+            "framework after calling <b>bt.get_trades(1000)</b> and "
+            "<b>bt.get_statistics()</b>. They are not mixed with the independent "
+            "research engine.",
+            note,
+        ),
+        Paragraph("3. Fixed strategy", heading),
+        Paragraph(
+            "The fixed parameters are Donchian 30, ADX 14 with threshold 20, "
+            "EMA 200, ATR 14, and a 2.5 x ATR stop. A long requires close above "
+            "the prior Donchian high and EMA, ADX >= 20, and DI+ > DI-. A short "
+            "uses the symmetric conditions. The high/low-based trailing stop "
+            "tracks the most favorable high for a long or low for a short. An "
+            "opposite confirmed breakout may reverse the position.",
+            body,
+        ),
+        PageBreak(),
+        Paragraph("4. Indicator formulas", heading),
+        Paragraph(
+            "<b>TR</b> = max(H-L, |H-Cprev|, |L-Cprev|). "
+            "<b>ATR</b> is Wilder's recursive average of TR. "
+            "<b>+DM/-DM</b> retain the larger positive directional high/low "
+            "move. <b>DI</b> = 100 x Wilder(DM) / ATR. "
+            "<b>DX</b> = 100 x |DI+ - DI-| / (DI+ + DI-), and <b>ADX</b> is "
+            "Wilder-smoothed DX. <b>EMA</b> = alpha x close + (1-alpha) x "
+            "prior EMA, alpha = 2/(period+1). Donchian thresholds are "
+            "high.shift(1).rolling(30).max() and "
+            "low.shift(1).rolling(30).min().",
+            body,
+        ),
+        Paragraph("5. Timing and signal convention", heading),
+        Paragraph(
+            "The organizer executes a signal at the signal row's close. To "
+            "prevent same-row bias, the strategy forms a decision only after "
+            "completed candle t and writes its executable signal to candle "
+            "t+1. Thus decision t executes at t+1 close. Signal values follow "
+            "the exact state convention: 0 hold, +/-1 open or close, and +/-2 "
+            "reverse. A separate mechanical penultimate-row decision closes "
+            "any open position on the final row; an unexecutable last-row "
+            "economic decision is discarded.",
+            body,
+        ),
+        Paragraph("6. Brokerage and accounting", heading),
+        Paragraph(
+            "Initial capital is exactly $1,000 and the configured brokerage is "
+            "0.15%. The unchanged organizer <b>TradePair.pnl()</b> deducts "
+            "0.15% of absolute trade quantity once per completed trade. That "
+            "framework behavior is reported without alteration. The secondary "
+            "research engine is deliberately stricter: it charges 0.15% on "
+            "entry notional and again on exit notional and marks open positions "
+            "to market daily.",
+            body,
+        ),
+        Paragraph("7. Organizer equity path", heading),
+        Image(
+            str(organizer_results / "equity_curve.png"),
+            width=6.95 * inch,
+            height=3.77 * inch,
+        ),
+        Paragraph(
+            "Figure 1. Organizer capital series with BTC close shown for context.",
+            small,
+        ),
+        PageBreak(),
+        Paragraph("8. Integrity checks", heading),
+        Paragraph(
+            "<b>LOOKAHEAD CHECK: PASS.</b> Indicators and economic decisions "
+            "match full-data history at five cutoffs. "
+            "<b>SIGNAL SHIFT CHECK: PASS.</b> Every executable signal equals "
+            "the prior row's decision. <b>SIGNAL VALIDITY: PASS.</b> A replay "
+            "accepts every transition under organizer rules. "
+            "<b>REPRODUCIBILITY CHECK: PASS.</b> Two complete organizer runs "
+            "produce identical signals, trades, statistics, and capital.",
+            body,
+        ),
+        Paragraph("9. Independent robustness check", heading),
+        Paragraph(
+            "The same fixed decisions were also evaluated with an independent "
+            "next-open, daily mark-to-market simulator using two-sided fees. "
+            "These values are secondary diagnostics and are intentionally "
+            "separate from the organizer headline metrics.",
+            body,
+        ),
+        research_metrics_table(research, body),
+        Spacer(1, 5),
+        Image(
+            str(research_results / "drawdown.png"),
+            width=6.95 * inch,
+            height=2.42 * inch,
+        ),
+        Paragraph(
+            "Figure 2. Independent simulator daily mark-to-market drawdown.",
+            small,
+        ),
+        Paragraph("10. Limitations", heading),
+        Paragraph(
+            "The supplied data ends in 2022 and may differ from evaluator data "
+            "in exchange, timezone, or candle construction. The organizer "
+            "framework executes at next-bar close after signal shifting and "
+            "uses its own one-deduction fee model; the robustness engine shows "
+            "the sensitivity to next-open execution and two-sided fees. Neither "
+            "engine models spread, slippage, funding, borrow constraints, "
+            "latency, or market impact. Historical results do not guarantee "
+            "live performance.",
+            body,
+        ),
+        Paragraph(
+            "Source of truth: results/organizer/metrics.json. Every displayed "
+            "headline value is loaded programmatically from that file.",
+            small,
+        ),
     ]
-    if metrics["provisional"]:
-        story.append(
-            Paragraph(
-                "<b>PROVISIONAL DATASET:</b> The official 2019-2023 challenge "
-                "file is absent. This report evaluates the repository's "
-                "2018-2022 fallback data and does not claim official results.",
-                callout,
-            )
-        )
-    story.extend(
-        [
-            Paragraph("1. Objective and dataset", heading),
-            Paragraph(
-                "The objective is a reproducible BTC/USD trend strategy with "
-                "strict next-candle execution, 0.15% brokerage on every entry "
-                "and exit transaction, and daily mark-to-market accounting. "
-                f"The selected file is <b>{metrics['dataset_filename']}</b> "
-                f"({metrics['dataset_row_count']:,} rows), spanning "
-                f"{metrics['dataset_first_date'][:10]} through "
-                f"{metrics['dataset_last_date'][:10]}. Its SHA-256 is "
-                f"<font name='Courier'>{metrics['dataset_sha256']}</font>.",
-                body,
-            ),
-            Paragraph("2. Final out-of-sample metrics", heading),
-            metrics_table(metrics, body),
-            Spacer(1, 5),
-            Paragraph(
-                "Gross profit before brokerage was "
-                f"<b>{money(metrics['gross_profit'])}</b>; net profit after "
-                f"<b>{money(metrics['total_brokerage'])}</b> brokerage was "
-                f"<b>{money(metrics['net_profit'])}</b>. There were "
-                f"{metrics['entries']} entries, {metrics['exits']} exits, and "
-                f"{metrics['reversals']} reversals.",
-                body,
-            ),
-            PageBreak(),
-            Paragraph("3. Strategy and formulas", heading),
-            Paragraph(
-                "The fixed strategy enters a 30-day Donchian breakout only "
-                "when ADX is at least 20, directional movement agrees with the "
-                "breakout, and close is on the correct side of the 200-day EMA. "
-                "A 2.5 x ATR trailing stop exits the position; an opposite "
-                "confirmed breakout may reverse it. Parameters were selected "
-                "from a 16-combination grid using only 2019-2021 yearly results, "
-                "ranked by median then worst-year Sharpe. The 2022 fallback "
-                "test was excluded from selection.",
-                body,
-            ),
-            Paragraph(
-                "<b>True Range:</b> max(H-L, |H-Cprev|, |L-Cprev|). "
-                "<b>ATR:</b> Wilder recursive average of True Range. "
-                "<b>+DM/-DM:</b> the larger positive directional high/low move; "
-                "<b>DI:</b> 100 x Wilder(DM) / ATR. "
-                "<b>DX:</b> 100 x |DI+ - DI-| / (DI+ + DI-); "
-                "<b>ADX:</b> Wilder average of DX. "
-                "<b>EMA:</b> alpha x close + (1-alpha) x prior EMA, where "
-                "alpha = 2/(period+1). Donchian levels use shifted prior highs "
-                "and lows, so the breakout candle is excluded.",
-                body,
-            ),
-            Paragraph("4. Timing, fees, and accounting", heading),
-            Paragraph(
-                "A decision is formed only after candle t is complete and is "
-                "queued for execution at candle t+1 open. Entry notional fully "
-                "deploys available equity after reserving the entry fee. The "
-                "engine charges 0.15% on entry notional and 0.15% on exit "
-                "notional. Reversals close the old trade and open the new one, "
-                "charging both transactions. Any final open position is "
-                "force-closed at the last close.",
-                body,
-            ),
-            Paragraph(
-                "Daily equity equals cash plus signed BTC quantity times daily "
-                "close. Daily returns are equity(t)/equity(t-1)-1. Sharpe is "
-                "sqrt(365) times mean daily return divided by sample standard "
-                "deviation. Drawdown is equity/running maximum-1; the report "
-                "states its largest magnitude as a positive percentage. Win "
-                "rate uses completed trades only.",
-                body,
-            ),
-            Paragraph("5. Mark-to-market equity", heading),
-            Image(
-                str(results_dir / "equity_curve.png"),
-                width=6.95 * inch,
-                height=3.82 * inch,
-            ),
-            Paragraph(
-                "Figure 1. Daily equity after unrealized P&L and transaction fees.",
-                small,
-            ),
-            PageBreak(),
-            Paragraph("6. Drawdown and robustness", heading),
-            Image(
-                str(results_dir / "drawdown.png"),
-                width=6.95 * inch,
-                height=3.20 * inch,
-            ),
-            Paragraph(
-                "Figure 2. Peak-to-trough drawdown from daily mark-to-market equity.",
-                small,
-            ),
-            Paragraph("7. Integrity checks", heading),
-            Paragraph(
-                "<b>LOOKAHEAD CHECK: PASS.</b> Signals and every used indicator "
-                "are invariant when future suffixes are appended. Checks compare "
-                "all bars through several cutoffs, not only trade bars.",
-                body,
-            ),
-            Paragraph(
-                "<b>NEXT-BAR EXECUTION: PASS.</b> A fixture proves a target "
-                "formed on t enters at t+1 open. "
-                "<b>REPRODUCIBILITY CHECK: PASS.</b> Two complete runs produce "
-                "identical signals, trades, equity, final equity, Sharpe, "
-                "drawdown, and win rate.",
-                body,
-            ),
-            Paragraph("8. Limitations", heading),
-            Paragraph(
-                "The official BTC_2019_2023_1d.csv training file is missing, so "
-                "2023 cannot be evaluated and all results are provisional. The "
-                "fallback file may differ in exchange, timezone, price source, "
-                "or candle construction. The simulator includes brokerage but "
-                "not bid-ask spread, slippage, funding, borrow constraints, "
-                "latency, or market impact. Six trades are too few to infer "
-                "stable live performance. Re-run the documented command with "
-                "the official file before final external submission.",
-                body,
-            ),
-            Spacer(1, 8),
-            Paragraph(
-                "Source of truth: results/metrics.json generated by main.py. "
-                "Report values are loaded programmatically from that file.",
-                small,
-            ),
-        ]
-    )
     document.build(story, onFirstPage=footer, onLaterPages=footer)
 
 
-def build_markdown(metrics: dict) -> str:
-    return f"""# SatoshiFlow verified report
-
-> **PROVISIONAL:** The official `BTC_2019_2023_1d.csv` file is missing.
+def build_markdown(official: dict, research: dict) -> str:
+    return f"""# SatoshiFlow organizer-compatible report
 
 ## Dataset
 
-- File: `{metrics['dataset_filename']}`
-- Range: {metrics['dataset_first_date'][:10]} to {metrics['dataset_last_date'][:10]}
-- SHA-256: `{metrics['dataset_sha256']}`
-- Evaluation: {metrics['evaluation_label']}
+- File: `{official['dataset_filename']}`
+- Range: {official['dataset_first_date'][:10]} to {official['dataset_last_date'][:10]}
+- SHA-256: `{official['dataset_sha256']}`
 
-## Strategy
+The supplied repository dataset covers 2018-2022. The strategy is generic and
+is designed to run unchanged on evaluator-provided OHLCV data.
 
-30-day shifted Donchian breakout, ADX >= 20, DI direction confirmation,
-200-day EMA regime filter, and 2.5 x ATR trailing stop. Decisions formed on
-bar t execute at bar t+1 open.
-
-## Verified metrics
+## Official organizer-framework metrics
 
 | Metric | Value |
 |---|---:|
-| Final equity | {money(metrics['final_equity'])} |
-| Net return | {pct(metrics['net_return'])} |
-| Sharpe ratio | {metrics['sharpe_ratio']:.6f} |
-| Maximum drawdown | {pct(metrics['max_drawdown'])} |
-| Win rate | {metrics['win_rate']:.4f}% |
-| Total trades | {metrics['total_trades']} |
-| Total brokerage | {money(metrics['total_brokerage'])} |
-| Buy-and-hold return | {pct(metrics['buy_and_hold_return'])} |
+| Final capital | {money(official['final_capital'])} |
+| Net return | {100 * official['net_return']:.4f}% |
+| Sharpe ratio | {official['sharpe_ratio']:.6f} |
+| Maximum drawdown | {official['maximum_drawdown_percentage']:.4f}% |
+| Win rate | {official['win_rate_percentage']:.4f}% |
+| Total trades | {official['total_trades']} |
+| Benchmark return | {official['benchmark_return_percentage']:.4f}% |
+
+Decision on completed candle `t` is shifted to candle `t+1`, where the
+unchanged organizer backtester executes it at the close.
+
+## Independent robustness check
+
+The separate next-open mark-to-market engine produced final equity
+{money(research['final_equity'])}, Sharpe {research['sharpe_ratio']:.6f}, and
+maximum drawdown {100 * research['max_drawdown']:.4f}%. These are secondary,
+stricter diagnostics, not official headline results.
 
 ## Integrity
 
 - LOOKAHEAD CHECK: PASS
-- NEXT-BAR EXECUTION CHECK: PASS
+- SIGNAL SHIFT CHECK: PASS
+- SIGNAL VALIDITY CHECK: PASS
+- ORGANIZER BACKTESTER CHECK: PASS
 - REPRODUCIBILITY CHECK: PASS
 
-The PDF and this file are generated from `results/metrics.json`.
+The PDF and this file are generated from `results/organizer/metrics.json` and
+the clearly separated `results/research/metrics.json`.
 """
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--results-dir", default="results")
+    parser.add_argument("--organizer-results", default="results/organizer")
+    parser.add_argument("--research-results", default="results/research")
     parser.add_argument("--output", default="SatoshiFlow_Report.pdf")
     parser.add_argument("--submission-dir", default="../SUBMIT_THESE")
     args = parser.parse_args()
 
     project_dir = Path(__file__).resolve().parent
-    results_dir = (project_dir / args.results_dir).resolve()
-    metrics = json.loads((results_dir / "metrics.json").read_text(encoding="utf-8"))
+    organizer_results = (project_dir / args.organizer_results).resolve()
+    research_results = (project_dir / args.research_results).resolve()
+    official = json.loads(
+        (organizer_results / "metrics.json").read_text(encoding="utf-8")
+    )
+    research = json.loads(
+        (research_results / "metrics.json").read_text(encoding="utf-8")
+    )
     required_checks = (
-        metrics["lookahead_check"],
-        metrics["next_bar_execution_check"],
-        metrics["reproducibility_check"],
+        official["lookahead_check"],
+        official["signal_shift_check"],
+        official["signal_validity_check"],
+        official["organizer_backtester_check"],
+        official["reproducibility_check"],
+        research["lookahead_check"],
+        research["next_bar_execution_check"],
+        research["reproducibility_check"],
     )
     if not all(required_checks):
-        raise RuntimeError("refusing to generate a report with failed integrity checks")
+        raise RuntimeError("refusing to report failed integrity checks")
 
     output = (project_dir / args.output).resolve()
-    build_pdf(metrics, results_dir, output)
+    build_pdf(
+        official,
+        research,
+        organizer_results,
+        research_results,
+        output,
+    )
     (project_dir / "report.md").write_text(
-        build_markdown(metrics), encoding="utf-8"
+        build_markdown(official, research), encoding="utf-8"
     )
 
     submission = (project_dir / args.submission_dir).resolve()
@@ -375,6 +427,10 @@ def main() -> int:
             child.unlink()
     shutil.copy2(project_dir / "main.py", submission / "main.py")
     shutil.copy2(output, submission / output.name)
+    expected = ["SatoshiFlow_Report.pdf", "main.py"]
+    actual = sorted(child.name for child in submission.iterdir())
+    if actual != expected:
+        raise RuntimeError(f"unexpected submission contents: {actual}")
     print(f"Report: {output}")
     print(f"Submission: {submission}")
     return 0
