@@ -50,7 +50,9 @@ def main() -> int:
         "SatoshiFlow_Report.pdf",
         "main.py",
     ]
-    assert (submission / "main.py").read_bytes() == (project / "main.py").read_bytes()
+    project_main = (project / "main.py").read_bytes().replace(b"\r\n", b"\n")
+    submission_main = (submission / "main.py").read_bytes().replace(b"\r\n", b"\n")
+    assert submission_main == project_main
     assert (submission / "SatoshiFlow_Report.pdf").read_bytes() == pdf.read_bytes()
     assert git_blob_id(project / "backtester.py") == ORIGINAL_BACKTESTER_BLOB
     assert all(
